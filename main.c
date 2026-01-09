@@ -1,0 +1,950 @@
+/* snac - A simple, minimalistic ActivityPub instance */
+/* copyright (c) 2022 - 2026 grunfink et al. / MIT license */
+
+#include "xs.h"
+#include "xs_io.h"
+#include "xs_json.h"
+#include "xs_time.h"
+#include "xs_openssl.h"
+#include "xs_match.h"
+#include "xs_random.h"
+#include "xs_http.h"
+
+#include "snac.h"
+
+#include <sys/stat.h>
+#include <sys/wait.h>
+
+int usage(const char *cmd)
+{
+    printf("snac " VERSION " - A simple, minimalistic ActivityPub instance\n");
+    printf("Copyright (c) 2022 - 2026 grunfink et al. / MIT license\n");
+    printf("\n");
+
+    if (cmd == NULL) {
+        printf("Commands:\n");
+        printf("\n");
+    }
+
+    const char *cmds =
+        "init [{basedir}]                     Initializes the data storage\n"
+        "upgrade {basedir}                    Upgrade to a new version\n"
+        "adduser {basedir} [{uid}]            Adds a new user\n"
+        "deluser {basedir} {uid}              Deletes a user\n"
+        "update {basedir} {uid}               Sends a user's updated profile\n"
+        "httpd {basedir}                      Starts the HTTPD daemon\n"
+        "purge {basedir}                      Purges old data\n"
+        "state {basedir}                      Prints server state\n"
+        "webfinger {basedir} {account}        Queries about an account (@user@host or actor url)\n"
+        "queue {basedir} {uid}                Processes a user queue\n"
+        "follow {basedir} {uid} {actor}       Follows an actor\n"
+        "unfollow {basedir} {uid} {actor}     Unfollows an actor\n"
+        "request {basedir} {uid} {url}        Requests an object\n"
+        "insert {basedir} {uid} {url}         Requests an object and inserts it into the timeline\n"
+        "collect_replies {basedir} {uid} {url} Collects all replies from a post\n"
+        "actor {basedir} [{uid}] {url}        Requests an actor\n"
+        "note {basedir} {uid} {text} [files...] Sends a note with optional attachments\n"
+        "note_unlisted {basedir} {uid} {text} [files...] Sends an unlisted note with optional attachments\n"
+        "note_mention {basedir} {uid} {text} [files...] Sends a note only to mentioned accounts\n"
+        "note_followers {basedir} {uid} {text} [files...] Sends a note only to followers\n"
+        "boost|announce {basedir} {uid} {url} Boosts (announces) a post\n"
+        "unboost {basedir} {uid} {url}        Unboosts a post\n"
+        "resetpwd {basedir} {uid}             Resets the password of a user\n"
+        "ping {basedir} {uid} {actor}         Pings an actor\n"
+        "webfinger_s {basedir} {uid} {account} Queries about an account (@user@host or actor url)\n"
+        "pin {basedir} {uid} {msg_url}        Pins a message\n"
+        "unpin {basedir} {uid} {msg_url}      Unpins a message\n"
+        "bookmark {basedir} {uid} {msg_url}   Bookmarks a message\n"
+        "unbookmark {basedir} {uid} {msg_url} Unbookmarks a message\n"
+        "block {basedir} {instance_url}       Blocks a full instance\n"
+        "unblock {basedir} {instance_url}     Unblocks a full instance\n"
+        "limit {basedir} {uid} {actor}        Limits an actor (drops their announces)\n"
+        "unlimit {basedir} {uid} {actor}      Unlimits an actor\n"
+        "muted {basedir} {uid}                Lists the muted actors\n"
+        "unmute {basedir} {uid} {actor}       Unmutes a previously muted actor\n"
+        "verify_links {basedir} {uid}         Verifies a user's links (in the metadata)\n"
+        "search {basedir} {uid} {regex}       Searches posts by content\n"
+        "export_csv {basedir} {uid}           Exports followers, lists, MUTEd and bookmarks to CSV\n"
+        "export_posts {basedir} {uid}         Exports all posts to outbox.json\n"
+        "alias {basedir} {uid} {account}      Sets account (@user@host or actor url) as an alias\n"
+        "migrate {basedir} {uid}              Migrates to the account defined as the alias\n"
+        "import_csv {basedir} {uid}           Imports data from CSV files\n"
+        "import_list {basedir} {uid} {file}   Imports a Mastodon CSV list file\n"
+        "import_block_list {basedir} {uid} {file} Imports a Mastodon CSV block list file\n"
+        "lists {basedir} {uid}                Returns the names of the lists created by the user\n"
+        "list_members {basedir} {uid} {name}  Returns the list of accounts inside a list\n"
+        "list_create {basedir} {uid} {name}   Creates a new list\n"
+        "list_remove {basedir} {uid} {name}   Removes an existing list\n"
+        "list_add {basedir} {uid} {name} {acct} Adds an account (@user@host or actor url) to a list\n"
+        "list_del {basedir} {uid} {name} {actor} Deletes an actor URL from a list\n";
+
+    if (cmd == NULL)
+        printf("%s", cmds);
+    else {
+        /* only show help for the entered command */
+        xs *l = xs_split(cmds, "\n");
+        const char *v;
+        int cnt = 0;
+
+        xs_list_foreach(l, v) {
+            if (xs_str_in(v, cmd) != -1) {
+                printf("%s\n", v);
+                cnt++;
+            }
+        }
+
+        if (cnt == 0)
+            printf("%s", cmds);
+    }
+
+    return 1;
+}
+
+
+char *get_argv(int *argi, int argc, char *argv[])
+{
+    if (*argi < argc)
+        return argv[(*argi)++];
+    else
+        return NULL;
+}
+
+
+#define GET_ARGV() get_argv(&argi, argc, argv)
+
+int main(int argc, char *argv[])
+{
+    char *cmd;
+    char *basedir;
+    char *user;
+    char *url;
+    int argi = 1;
+    snac snac;
+
+    /* ensure group has write access */
+    umask(0007);
+
+    if ((cmd = GET_ARGV()) == NULL)
+        return usage(cmd);
+
+    if (strcmp(cmd, "init") == 0) { /** **/
+        /* initialize the data storage */
+        /* ... */
+        basedir = GET_ARGV();
+
+        return snac_init(basedir);
+    }
+
+    if ((basedir = getenv("SNAC_BASEDIR")) == NULL) {
+        if ((basedir = GET_ARGV()) == NULL)
+            return usage(cmd);
+    }
+
+    if (strcmp(cmd, "upgrade") == 0) { /** **/
+        int ret;
+
+        /* upgrade */
+        if ((ret = srv_open(basedir, 1)) == 1)
+            srv_log(xs_dup("OK"));
+
+        return ret;
+    }
+
+    if (!srv_open(basedir, 0)) {
+        srv_log(xs_fmt("error opening data storage at %s", basedir));
+        return 1;
+    }
+
+    if (strcmp(cmd, "adduser") == 0) { /** **/
+        user = GET_ARGV();
+
+        return adduser(user);
+
+        return 0;
+    }
+
+    if (strcmp(cmd, "httpd") == 0) { /** **/
+        httpd();
+        srv_free();
+        return 0;
+    }
+
+    if (strcmp(cmd, "purge") == 0) { /** **/
+        purge_all();
+        return 0;
+    }
+
+    if (strcmp(cmd, "poll_hashtag_rss") == 0) { /** **/
+        rss_poll_hashtags();
+        return 0;
+    }
+
+    if (strcmp(cmd, "state") == 0) { /** **/
+        xs *shm_name = NULL;
+        srv_state *p_state = srv_state_op(&shm_name, 1);
+
+        if (p_state == NULL)
+            return 1;
+
+        srv_state ss = *p_state;
+        int n;
+
+        printf("server: %s (%s)\n", xs_dict_get(srv_config, "host"), USER_AGENT);
+        xs *uptime = xs_str_time_diff(time(NULL) - ss.srv_start_time);
+        printf("uptime: %s\n", uptime);
+        printf("job fifo size (cur): %d\n", ss.job_fifo_size);
+        printf("job fifo size (peak): %d\n", ss.peak_job_fifo_size);
+        char *th_states[] = { "stopped", "waiting", "input", "output" };
+
+        for (n = 0; n < ss.n_threads; n++)
+            printf("thread #%d state: %s\n", n, th_states[ss.th_state[n]]);
+
+        return 0;
+    }
+
+    if ((user = GET_ARGV()) == NULL)
+        return usage(cmd);
+
+    if (strcmp(cmd, "block") == 0) { /** **/
+        int ret = instance_block(user);
+
+        if (ret < 0) {
+            fprintf(stderr, "Error blocking instance %s: %d\n", user, ret);
+            return 1;
+        }
+
+        return 0;
+    }
+
+    if (strcmp(cmd, "unblock") == 0) { /** **/
+        int ret = instance_unblock(user);
+
+        if (ret < 0) {
+            fprintf(stderr, "Error unblocking instance %s: %d\n", user, ret);
+            return 1;
+        }
+
+        return 0;
+    }
+
+    if (strcmp(cmd, "webfinger") == 0) { /** **/
+        xs *actor = NULL;
+        xs *uid = NULL;
+        int status;
+
+        status = webfinger_request(user, &actor, &uid);
+
+        printf("status: %d\n", status);
+        if (actor != NULL)
+            printf("actor: %s\n", actor);
+        if (uid != NULL)
+            printf("uid: %s\n", uid);
+
+        return 0;
+    }
+
+    if (argi == argc && strcmp(cmd, "actor") == 0) { /** **/
+        /* query an actor without user (non-signed) */
+        xs *actor = NULL;
+        int status;
+
+        status = actor_request(NULL, user, &actor);
+
+        printf("status: %d\n", status);
+        if (valid_status(status)) {
+            xs_json_dump(actor, 4, stdout);
+            printf("\n");
+        }
+
+        return 0;
+    }
+
+    if (!user_open(&snac, user)) {
+        printf("invalid user '%s'\n", user);
+        return 1;
+    }
+
+    lastlog_write(&snac, "cmdline");
+
+    if (strcmp(cmd, "resetpwd") == 0) { /** **/
+        return resetpwd(&snac);
+    }
+
+    if (strcmp(cmd, "deluser") == 0) { /** **/
+        return deluser(&snac);
+    }
+
+    if (strcmp(cmd, "update") == 0) { /** **/
+        xs *a_msg = msg_actor(&snac);
+        xs *u_msg = msg_update(&snac, a_msg);
+        enqueue_message(&snac, u_msg);
+        return 0;
+    }
+
+    if (strcmp(cmd, "queue") == 0) { /** **/
+        process_user_queue(&snac);
+        return 0;
+    }
+
+    if (strcmp(cmd, "verify_links") == 0) { /** **/
+        verify_links(&snac);
+        return 0;
+    }
+
+    if (strcmp(cmd, "timeline") == 0) { /** **/
+#if 0
+        xs *list = local_list(&snac, XS_ALL);
+        xs *body = html_timeline(&snac, list, 1);
+
+        printf("%s\n", body);
+        user_free(&snac);
+        srv_free();
+#endif
+
+        xs *idx  = xs_fmt("%s/private.idx", snac.basedir);
+        xs *list = index_list_desc(idx, 0, 256);
+        xs *tl   = timeline_top_level(&snac, list);
+
+        xs_json_dump(tl, 4, stdout);
+
+        return 0;
+    }
+
+    if (strcmp(cmd, "export_csv") == 0) { /** **/
+        export_csv(&snac);
+        return 0;
+    }
+
+    if (strcmp(cmd, "export_posts") == 0) { /** **/
+        export_posts(&snac);
+        return 0;
+    }
+
+    if (strcmp(cmd, "import_csv") == 0) { /** **/
+        import_csv(&snac);
+        return 0;
+    }
+
+    if (strcmp(cmd, "migrate") == 0) { /** **/
+        return migrate_account(&snac);
+    }
+
+    if (strcmp(cmd, "lists") == 0) { /** **/
+        xs *lol = list_maint(&snac, NULL, 0);
+        const xs_list *l;
+
+        xs_list_foreach(lol, l) {
+            printf("%s (%s)\n", xs_list_get(l, 1), xs_list_get(l, 0));
+        }
+
+        return 0;
+    }
+
+    if (strcmp(cmd, "muted") == 0) { /** **/
+        xs *l = muted_list(&snac);
+        const char *v;
+
+        xs_list_foreach(l, v)
+            printf("%s\n", v);
+
+        return 0;
+    }
+
+    if ((url = GET_ARGV()) == NULL)
+        return usage(cmd);
+
+    if (strcmp(cmd, "list_members") == 0) { /** **/
+        xs *lid = list_maint(&snac, url, 4);
+
+        if (lid != NULL) {
+            xs *lcont = list_members(&snac, lid, NULL, 0);
+            const char *md5;
+
+            xs_list_foreach(lcont, md5) {
+                xs *actor = NULL;
+
+                if (valid_status(object_get_by_md5(md5, &actor))) {
+                    printf("%s (%s)\n", xs_dict_get(actor, "id"), xs_dict_get_def(actor, "preferredUsername", ""));
+                }
+            }
+        }
+        else
+            fprintf(stderr, "Cannot find a list named '%s'\n", url);
+
+        return 0;
+    }
+
+    if (strcmp(cmd, "list_create") == 0) { /** **/
+        xs *lid = list_maint(&snac, url, 4);
+
+        if (lid == NULL) {
+            xs *n_lid = list_maint(&snac, url, 1);
+            printf("New list named '%s' created (%s)\n", url, n_lid);
+        }
+        else
+            fprintf(stderr, "A list named '%s' already exist\n", url);
+
+        return 0;
+    }
+
+    if (strcmp(cmd, "list_remove") == 0) { /** **/
+        xs *lid = list_maint(&snac, url, 4);
+
+        if (lid != NULL) {
+            list_maint(&snac, lid, 2);
+            printf("List '%s' (%s) deleted\n", url, lid);
+        }
+        else
+            fprintf(stderr, "Cannot find a list named '%s'\n", url);
+
+        return 0;
+    }
+
+    if (strcmp(cmd, "list_add") == 0) { /** **/
+        const char *account = GET_ARGV();
+
+        if (account != NULL) {
+            xs *lid = list_maint(&snac, url, 4);
+
+            if (lid != NULL) {
+                xs *actor = NULL;
+                xs *uid = NULL;
+
+                if (valid_status(webfinger_request(account, &actor, &uid))) {
+                    xs *md5 = xs_md5_hex(actor, strlen(actor));
+
+                    list_members(&snac, lid, md5, 1);
+                    printf("Actor %s (%s) added to list '%s' (%s)\n", actor, uid, url, lid);
+                }
+                else
+                    fprintf(stderr, "Cannot resolve account '%s'\n", account);
+            }
+            else
+                fprintf(stderr, "Cannot find a list named '%s'\n", url);
+
+        }
+
+        return 0;
+    }
+
+    if (strcmp(cmd, "list_del") == 0) { /** **/
+        const char *account = GET_ARGV();
+
+        if (account != NULL) {
+            xs *lid = list_maint(&snac, url, 4);
+
+            if (lid != NULL) {
+                xs *md5 = xs_md5_hex(account, strlen(account));
+
+                list_members(&snac, lid, md5, 2);
+                printf("Actor %s deleted from list '%s' (%s)\n", account, url, lid);
+            }
+            else
+                fprintf(stderr, "Cannot find a list named '%s'\n", url);
+
+        }
+
+        return 0;
+    }
+
+    if (strcmp(cmd, "alias") == 0) { /** **/
+        xs *actor = NULL;
+        xs *uid = NULL;
+        int status = HTTP_STATUS_OK;
+
+        if (*url == '\0')
+            actor = xs_dup("");
+        else
+            status = webfinger_request(url, &actor, &uid);
+
+        if (valid_status(status)) {
+            if (strcmp(actor, snac.actor) == 0) {
+                snac_log(&snac, xs_fmt("You can't be your own alias"));
+                return 1;
+            }
+            else {
+                snac.config = xs_dict_set(snac.config, "alias", actor);
+                snac.config = xs_dict_set(snac.config, "alias_raw", url);
+
+                user_persist(&snac, 1);
+            }
+        }
+        else {
+            snac_log(&snac, xs_fmt("Webfinger error for %s %d", url, status));
+            return 1;
+        }
+
+        return 0;
+    }
+
+    if (strcmp(cmd, "webfinger_s") == 0) { /** **/
+        xs *actor = NULL;
+        xs *uid = NULL;
+        int status;
+
+        status = webfinger_request_signed(&snac, url, &actor, &uid);
+
+        printf("status: %d\n", status);
+        if (actor != NULL)
+            printf("actor: %s\n", actor);
+        if (uid != NULL)
+            printf("uid: %s\n", uid);
+
+        return 0;
+    }
+
+    if (strcmp(cmd, "boost") == 0 || strcmp(cmd, "announce") == 0) { /** **/
+        xs *msg = msg_admiration(&snac, url, "Announce");
+
+        if (msg != NULL) {
+            enqueue_message(&snac, msg);
+            timeline_admire(&snac, xs_dict_get(msg, "object"), snac.actor, 0, "");
+
+            if (dbglevel) {
+                xs_json_dump(msg, 4, stdout);
+            }
+        }
+
+        return 0;
+    }
+
+
+    if (strcmp(cmd, "assist") == 0) { /** **/
+        /* undocumented: experimental (do not use) */
+        xs *msg = msg_admiration(&snac, url, "Accept");
+
+        if (msg != NULL) {
+            enqueue_message(&snac, msg);
+
+            if (dbglevel) {
+                xs_json_dump(msg, 4, stdout);
+            }
+        }
+
+        return 0;
+    }
+
+    if (strcmp(cmd, "unboost") == 0) { /** **/
+        xs *msg = msg_repulsion(&snac, url, "Announce");
+
+        if (msg != NULL) {
+            enqueue_message(&snac, msg);
+
+            if (dbglevel) {
+                xs_json_dump(msg, 4, stdout);
+            }
+        }
+
+        return 0;
+    }
+
+    if (strcmp(cmd, "follow") == 0) { /** **/
+        xs *msg = msg_follow(&snac, url);
+
+        if (msg != NULL) {
+            const char *actor = xs_dict_get(msg, "object");
+
+            following_add(&snac, actor, msg);
+
+            enqueue_output_by_actor(&snac, msg, actor, 0);
+
+            if (dbglevel) {
+                xs_json_dump(msg, 4, stdout);
+            }
+        }
+
+        return 0;
+    }
+
+    if (strcmp(cmd, "unfollow") == 0) { /** **/
+        xs *object = NULL;
+
+        if (valid_status(following_get(&snac, url, &object))) {
+            xs *msg = msg_undo(&snac, xs_dict_get(object, "object"));
+
+            following_del(&snac, url);
+
+            enqueue_output_by_actor(&snac, msg, url, 0);
+
+            snac_log(&snac, xs_fmt("unfollowed actor %s", url));
+        }
+        else
+            snac_log(&snac, xs_fmt("actor is not being followed %s", url));
+
+        return 0;
+    }
+
+    if (strcmp(cmd, "limit") == 0) { /** **/
+        int ret;
+
+        if (!following_check(&snac, url))
+            snac_log(&snac, xs_fmt("actor %s is not being followed", url));
+        else
+        if ((ret = limit(&snac, url)) == 0)
+            snac_log(&snac, xs_fmt("actor %s is now limited", url));
+        else
+            snac_log(&snac, xs_fmt("error limiting actor %s (%d)", url, ret));
+
+        return 0;
+    }
+
+    if (strcmp(cmd, "unlimit") == 0) { /** **/
+        int ret;
+
+        if (!following_check(&snac, url))
+            snac_log(&snac, xs_fmt("actor %s is not being followed", url));
+        else
+        if ((ret = unlimit(&snac, url)) == 0)
+            snac_log(&snac, xs_fmt("actor %s is no longer limited", url));
+        else
+            snac_log(&snac, xs_fmt("error unlimiting actor %s (%d)", url, ret));
+
+        return 0;
+    }
+
+    if (strcmp(cmd, "unmute") == 0) { /** **/
+        if (is_muted(&snac, url)) {
+            unmute(&snac, url);
+
+            printf("%s unmuted\n", url);
+        }
+        else
+            printf("%s actor is not muted\n", url);
+
+        return 0;
+    }
+
+    if (strcmp(cmd, "search") == 0) { /** **/
+        int to;
+
+        /* 'url' contains the regex */
+        xs *r = content_search(&snac, url, 1, 0, XS_ALL, 10, &to);
+
+        int c = 0;
+        const char *v;
+
+        /* print results as standalone links */
+        while (xs_list_next(r, &v, &c)) {
+            printf("%s/admin/p/%s\n", snac.actor, v);
+        }
+
+        return 0;
+    }
+
+    if (strcmp(cmd, "ping") == 0) { /** **/
+        xs *actor_o = NULL;
+
+        if (!xs_startswith(url, "https:/")) {
+            /* try to resolve via webfinger */
+            if (!valid_status(webfinger_request(url, &url, NULL))) {
+                srv_log(xs_fmt("cannot resolve %s via webfinger", url));
+                return 1;
+            }
+        }
+
+        if (valid_status(actor_request(&snac, url, &actor_o))) {
+            xs *msg = msg_ping(&snac, url);
+
+            enqueue_output_by_actor(&snac, msg, url, 0);
+
+            if (dbglevel) {
+                xs_json_dump(msg, 4, stdout);
+            }
+
+            srv_log(xs_fmt("Ping sent to %s -- see log for Pong reply", url));
+        }
+        else {
+            srv_log(xs_fmt("Error getting actor %s", url));
+            return 1;
+        }
+
+        return 0;
+    }
+
+    if (strcmp(cmd, "pin") == 0) { /** **/
+        int ret = pin(&snac, url);
+        if (ret < 0) {
+            fprintf(stderr, "error pinning %s %d\n", url, ret);
+            return 1;
+        }
+
+        return 0;
+    }
+
+    if (strcmp(cmd, "unpin") == 0) { /** **/
+        int ret = unpin(&snac, url);
+        if (ret < 0) {
+            fprintf(stderr, "error unpinning %s %d\n", url, ret);
+            return 1;
+        }
+
+        return 0;
+    }
+
+    if (strcmp(cmd, "bookmark") == 0) { /** **/
+        int ret = bookmark(&snac, url);
+        if (ret < 0) {
+            fprintf(stderr, "error bookmarking %s %d\n", url, ret);
+            return 1;
+        }
+
+        return 0;
+    }
+
+    if (strcmp(cmd, "unbookmark") == 0) { /** **/
+        int ret = unbookmark(&snac, url);
+        if (ret < 0) {
+            fprintf(stderr, "error unbookmarking %s %d\n", url, ret);
+            return 1;
+        }
+
+        return 0;
+    }
+
+    if (strcmp(cmd, "question") == 0) { /** **/
+        int end_secs = 5 * 60;
+        xs *opts = xs_split(url, ";");
+
+        xs *msg = msg_question(&snac, "Poll", NULL, opts, 0, end_secs);
+        xs *c_msg = msg_create(&snac, msg);
+
+        if (dbglevel) {
+            xs_json_dump(c_msg, 4, stdout);
+        }
+
+        enqueue_message(&snac, c_msg);
+        enqueue_close_question(&snac, xs_dict_get(msg, "id"), end_secs);
+
+        timeline_add(&snac, xs_dict_get(msg, "id"), msg);
+
+        return 0;
+    }
+
+    if (strcmp(cmd, "request") == 0) { /** **/
+        int status;
+        xs *data = NULL;
+
+        status = activitypub_request(&snac, url, &data);
+
+        printf("status: %d\n", status);
+
+        if (data != NULL) {
+            xs_json_dump(data, 4, stdout);
+        }
+
+        return 0;
+    }
+
+    if (strcmp(cmd, "collect_replies") == 0) { /** **/
+        enqueue_collect_replies(&snac, url);
+
+        return 0;
+    }
+
+    if (strcmp(cmd, "collect_outbox") == 0) { /** **/
+        enqueue_collect_outbox(&snac, url);
+        return 0;
+    }
+
+    if (strcmp(cmd, "insert") == 0) { /** **/
+        int status;
+        xs *data = NULL;
+
+        status = activitypub_request(&snac, url, &data);
+
+        printf("status: %d\n", status);
+
+        if (data != NULL) {
+            xs_json_dump(data, 4, stdout);
+            enqueue_actor_refresh(&snac, xs_dict_get(data, "attributedTo"), 0);
+
+            if (!timeline_here(&snac, url))
+                timeline_add(&snac, url, data);
+            else
+                printf("Post %s already here\n", url);
+        }
+
+        return 0;
+    }
+
+    if (strcmp(cmd, "request2") == 0) { /** **/
+        enqueue_object_request(&snac, url, 2);
+
+        return 0;
+    }
+
+    if (strcmp(cmd, "actor") == 0) { /** **/
+        int status;
+        xs *data = NULL;
+
+        status = actor_request(&snac, url, &data);
+
+        printf("status: %d\n", status);
+
+        if (valid_status(status)) {
+            xs_json_dump(data, 4, stdout);
+        }
+
+        return 0;
+    }
+
+    if (strcmp(cmd, "import_list") == 0) { /** **/
+        import_list_csv(&snac, url);
+
+        return 0;
+    }
+
+    if (strcmp(cmd, "import_block_list") == 0) { /** **/
+        import_blocked_accounts_csv(&snac, url);
+
+        return 0;
+    }
+
+    if (strcmp(cmd, "note") == 0 ||             /** **/
+        strcmp(cmd, "note_unlisted") == 0 ||    /** **/
+        strcmp(cmd, "note_mention") == 0 ||     /** **/
+        strcmp(cmd, "note_followers") == 0) {   /** **/
+        xs *content = NULL;
+        xs *msg = NULL;
+        xs *c_msg = NULL;
+        xs *attl = xs_list_new();
+        const char *fn = NULL;
+        const char *in_reply_to = NULL;
+        const char **arg_irt = NULL;
+        int arg_date = 0;
+        xs *post_date = NULL;
+
+        /* iterate possible attachments */
+        while ((fn = GET_ARGV())) {
+            FILE *f;
+
+            if (arg_irt) {
+                *arg_irt = fn;
+                arg_irt = NULL;
+            }
+            else
+            if (arg_date) {
+                /* convert to ISO */
+                time_t t = xs_parse_localtime(fn, "%Y%m%d%H%M%S");
+
+                if (t == 0) {
+                    fprintf(stderr, "Invalid scheduled date format (must be YYYYmmddHHMMSS)\n");
+                    return 1;
+                }
+
+                post_date = xs_str_iso_date(t);
+                arg_date = 0;
+            }
+            else
+            if (strcmp(fn, "-r") == 0) {
+                /* next argument is an inReplyTo */
+                arg_irt = &in_reply_to;
+            }
+            else
+            if (strcmp(fn, "-d") == 0) {
+                /* next argument is the schedule date */
+                arg_date = 1;
+            }
+            else
+            if ((f = fopen(fn, "rb")) != NULL) {
+                /* get the file size and content */
+                fseek(f, 0, SEEK_END);
+                int sz = ftell(f);
+                fseek(f, 0, SEEK_SET);
+                xs *atc = xs_readall(f);
+                fclose(f);
+
+                char *ext = strrchr(fn, '.');
+                char rnd[32];
+                xs_rnd_buf(rnd, sizeof(rnd));
+                xs *hash  = xs_md5_hex(rnd, sizeof(rnd));
+                xs *id    = xs_fmt("post-%s%s", hash, ext ? ext : "");
+                xs *url   = xs_fmt("%s/s/%s", snac.actor, id);
+
+                /* store */
+                static_put(&snac, id, atc, sz);
+
+                xs *l = xs_list_new();
+
+                l = xs_list_append(l, url);
+                l = xs_list_append(l, ""); /* alt text */
+
+                attl = xs_list_append(attl, l);
+            }
+            else
+                fprintf(stderr, "Error opening '%s' as attachment\n", fn);
+        }
+
+        if (strcmp(url, "-e") == 0) {
+            /* get the content from an editor */
+#define EDITOR "$EDITOR "
+            char cmd[] = EDITOR "/tmp/snac-XXXXXX";
+            FILE *f;
+            int fd = mkstemp(cmd + strlen(EDITOR));
+
+            if (fd >= 0) {
+                int status = system(cmd);
+
+                if (WIFEXITED(status) && WEXITSTATUS(status) == 0 && (f = fdopen(fd, "r")) != NULL) {
+                    content = xs_readall(f);
+                    fclose(f);
+                    unlink(cmd + strlen(EDITOR));
+                } else {
+                    printf("Nothing to send\n");
+                    close(fd);
+                    return 1;
+                }
+            } else {
+                fprintf(stderr, "Temp file creation failed\n");
+                return 1;
+            }
+        }
+        else
+        if (strcmp(url, "-") == 0) {
+            /* get the content from stdin */
+            content = xs_readall(stdin);
+        }
+        else
+            content = xs_dup(url);
+
+        if (!content || !*content) {
+            fprintf(stderr, "Nothing to send\n");
+            return 1;
+        }
+
+        int scope = SCOPE_PUBLIC;
+        if (strcmp(cmd, "note_mention") == 0)
+            scope = SCOPE_MENTIONED;
+        else
+        if (strcmp(cmd, "note_unlisted") == 0)
+            scope = SCOPE_UNLISTED;
+        else
+        if (strcmp(cmd, "note_followers") == 0)
+            scope = SCOPE_FOLLOWERS;
+
+        msg = msg_note(&snac, content, NULL, in_reply_to, attl, scope, getenv("LANG"), post_date);
+
+        const char *id = xs_dict_get(msg, "id");
+
+        if (post_date)
+            schedule_add(&snac, id, msg);
+        else {
+            c_msg = msg_create(&snac, msg);
+
+            if (dbglevel) {
+                xs_json_dump(c_msg, 4, stdout);
+            }
+
+            enqueue_message(&snac, c_msg);
+            enqueue_webmention(msg);
+
+            timeline_add(&snac, id, msg);
+        }
+
+        return 0;
+    }
+
+    fprintf(stderr, "ERROR: bad command '%s'\n", cmd);
+
+    return 1;
+}
