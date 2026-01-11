@@ -1,0 +1,403 @@
+/*Links styling*/
+a[href]:before {
+    content: "[";
+}
+a[href]:after {
+    content: "]";
+}
+a[href],
+a>span/*Only required because some instances do some strange stuff with links*/
+{
+    color: cyan;
+    text-decoration: none;
+}
+/*Header styling*/
+h1,
+.p-name,
+.snac-top-user-name {
+    font-size: 1em!important;
+    color: red;
+}
+h1:before,
+.p-name:before,
+.snac-top-user-name {
+    content: "# ";
+}
+h2,
+.snac-top-user-id {
+    font-size: 1em!important;
+    color: deepskyblue;
+}
+h2:before,
+.snac-top-user-id::before {
+    content: "## ";
+}
+h3 {
+    font-size: 1em;
+    color: magenta;
+}
+h3>a/*h3 colouring overrides the link*/
+{
+    color: magenta;
+}
+h3:not(.terminal-input)::before {
+    content: "### ";
+}
+h4:before {
+    content: "#### "
+}
+h4 {
+    font-size: 1em;
+    color: pink;
+}
+/*Markup styling*/
+strong,
+strong>span/*Once again due to weird instance styling*/
+{
+    color: coral;
+}
+strong:before {
+    content: "<";
+}
+strong:after {
+    content: ">";
+}
+ul {
+    list-style-type: none;
+}
+li>h3:before/*List prefix overrides h3 prefix*/
+{
+    content: "- " !important;
+}
+li:not(:has(h3)):before {
+    content: "- ";
+}
+/*Default SNAC css*/
+body {
+    width: 85%;
+    margin: auto;
+    line-height: 1.5;
+    padding: 0.8em;
+    word-wrap: break-word;
+    background-color: #333;
+}
+pre {
+    overflow-x: scroll;
+    /*Don't crop on overflow; this doesn't happen very often*/
+}
+.snac-embedded-video,
+img {
+    max-width: 100%
+}
+.snac-origin {
+    font-size: 85%
+}
+.snac-score {
+    float: right;
+    font-size: 85%
+}
+.snac-top-user {
+    text-align: center;
+    padding-bottom: 2em;
+}
+.snac-top-user-name {
+    font-size: 200%
+}
+.snac-top-user-id {
+    font-size: 150%
+}
+.snac-avatar {
+    float: left;
+    height: 2.5em;
+    padding: 0.25em
+}
+.snac-author {
+    font-size: 90%;
+    text-decoration: none
+}
+.snac-author-tag {
+    font-size: 80%
+}
+.snac-pubdate {
+    color: #a0a0a0;
+    font-size: 90%
+}
+.snac-top-controls {
+    padding-bottom: 1.5em
+}
+.snac-post {
+    border-top: 1px solid #a0a0a0;
+}
+.snac-children {
+    padding-left: 2em;
+    border-left: 1px solid #a0a0a0;
+}
+.snac-textarea {
+    font-family: inherit;
+    width: calc(100% - 6px);
+}
+.snac-history {
+    border: 1px solid #606060;
+    border-radius: 3px;
+    margin: 2.5em 0;
+    padding: 0 2em
+}
+.snac-btn-mute {
+    float: right;
+    margin-left: 0.5em
+}
+.snac-btn-unmute {
+    float: right;
+    margin-left: 0.5em
+}
+.snac-btn-follow {
+    float: right;
+    margin-left: 0.5em
+}
+.snac-btn-unfollow {
+    float: right;
+    margin-left: 0.5em
+}
+.snac-btn-hide {
+    float: right;
+    margin-left: 0.5em
+}
+.snac-btn-delete {
+    float: right;
+    margin-left: 0.5em
+}
+.snac-btn-limit {
+    float: right;
+    margin-left: 0.5em
+}
+.snac-btn-unlimit {
+    float: right;
+    margin-left: 0.5em
+}
+.snac-footer {
+    margin-top: 2em;
+    font-size: 75%;
+}
+.snac-poll-result {
+    margin-left: auto;
+    margin-right: auto;
+}
+/*Begin og segment*/
+* {
+    
+    color: white;
+    font-family: monospace;
+}
+input[type=text],
+input[type=url],
+textarea,
+input[type=password] {
+    background-color: white;
+    color: #333;
+}
+/*This makes buttons look like any other text - this was intended to have surrounding symbols,
+but it doesn't work on inputs, so you may want to re-enable the border for a11y*/
+input[type=submit] {
+    border-width: 0px;
+    color: lime;
+    background-color: #333;
+    font-size: .9em;
+    cursor: pointer;
+}
+@container style(--accessible-buttons: true) {
+    input[type=submit] {
+        border-width: 2px!important;
+    }
+}
+input[type=text] {
+    border-width: 0px;
+}
+/*Summary ajustments*/
+details[open]>summary::marker {
+    content: "v "
+}
+details>summary:hover {
+    cursor: pointer;
+}
+details>summary::marker {
+    color: hotpink;
+    content: "> "
+}
+/*Changes user @s in mentions and in posts*/
+.snac-origin>a,
+.snac-post-with-desc>p>b>a,
+.mention,
+.snac-author-tag,
+.mention>span {
+    color: mediumslateblue!important
+}
+.snac-origin>a::before,
+.mention::before,
+.snac-author::before,
+.snac-author-tag::before,
+.snac-post-with-desc>p>b>a:before {
+    content: "("!important;
+}
+.snac-origin>a::after,
+.mention::after,
+.snac-author::after,
+.snac-author-tag::after,
+.snac-post-with-desc>p>b>a::after {
+    content: ")"!important
+}
+/*Changes date from mm-dd-yyyy to [mm-dd-yyyy]*/
+.snac-pubdate::before {
+    content: "["
+}
+.snac-pubdate::after {
+    content: "]"
+}
+/*Origin ajustments - this includes boosts and replies*/
+.snac-origin {
+    color: indianred
+}
+.snac-origin::before {
+    content: "(("
+}
+.snac-origin::after {
+    content: "))"
+}
+/*Media fixes*/
+.snac-embedded-video,
+img {
+    max-width: 700px;
+    max-height: 500px;
+    height: fit-content;
+    object-fit: contain;
+}
+
+/*media query for small screens*/
+@media (max-width: 750px) {
+    .snac-embedded-video,
+    img {
+        max-width: 100%;
+        height: auto;
+    }
+}
+
+.snac-content-attachments>a::before,
+.snac-content-attachments>a::after {
+    content: ""
+}
+.snac-content-attachments,
+img {
+    animation-play-state: paused;
+}
+.snac-content-attachments:hover,
+img:hover {
+    animation-play-state: running;
+}
+.snac-content{
+    margin:0.5em 0 0.5em 0.4em;
+}
+.snac-top-user {
+    text-align: left;
+    padding-top: 1em;
+}
+/*User metadata*/
+.snac-metadata {
+    margin-top: 1em;
+    border: 1px white!important;
+    border-style: solid!important;
+}
+.snac-metadata>* {
+    display: inline;
+    color: orange;
+}
+.snac-metadata>.snac-property-name::before {
+    content: '[['
+}
+.snac-metadata>.snac-property-value::before {
+    content: ' '
+}
+.snac-metadata>.snac-property-value::after {
+    content: "]]\A";
+    white-space: pre;
+}
+.snac-metadata>br {
+    display: none
+}
+
+.snac-list-of-lists { 
+    padding-left: 0; 
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5em;
+    list-style-type: none;
+    
+}
+.snac-list-of-lists li { display: inline; }
+
+
+details{
+position:relative;
+}
+details > summary {
+  padding: 4px;
+  width: 250px;
+  background-color: transparent;
+  border: none;
+  cursor: pointer;
+  position:relative;
+  left:0;
+}
+
+details input,
+details textarea {
+    color: #555
+}
+
+details > div {
+  background-color: transparent;
+  padding: 4px;
+  margin: 0;
+  position:absolute;
+  top:0;
+  left:250px;
+}
+.snac-top-controls summary {
+    background-color: #555;
+}
+.snac-top-controls details > div {
+    background-color: #555;
+    z-index: 5;
+    border-left: 2px solid #333;
+}
+
+.snac-post details > div {
+    position: static;
+}
+
+.snac-post details {
+    margin-bottom: 0;
+}
+
+/* People page list layout (div-based, replaces details/summary in html_people_list) */
+.snac-people-list {
+    margin-bottom: 10px;
+}
+
+.snac-people-list input[type=text],
+.snac-people-list input[type=url],
+.snac-people-list input[type=checkbox],
+.snac-people-list textarea {
+    color: #555;
+}
+
+.snac-people-items {
+    background-color: transparent;
+    padding: 4px;
+    margin: 0;
+}
+
+.snac-operations input[type=text],
+.snac-operations input[type=url] {
+    width: 250px;
+    padding: 2px;
+    margin: 1px;
+}

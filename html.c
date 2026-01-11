@@ -23,27 +23,24 @@ int login(snac *user, const xs_dict *headers)
 /* tries a login */
 {
     int logged_in = 0;
-    const char *auth = xs_dict_get(headers, "authorization");
-
-    if (auth && xs_startswith(auth, "Basic ")) {
-        int sz;
-        xs *s1 = xs_crop_i(xs_dup(auth), 6, 0);
-        xs *s2 = xs_base64_dec(s1, &sz);
-
-        xs *l1 = xs_split_n(s2, ":", 1);
-
-        if (xs_list_len(l1) == 2) {
-            const char *uid  = xs_list_get(l1, 0);
-            const char *pwd  = xs_list_get(l1, 1);
-            const char *addr = xs_or(xs_dict_get(headers, "remote-addr"),
-                                     xs_dict_get(headers, "x-forwarded-for"));
-
-            if (badlogin_check(uid, addr)) {
-                logged_in = check_password(uid, pwd,
-                    xs_dict_get(user->config, "passwd"));
-
-                if (!logged_in)
-                    badlogin_inc(uid, addr);
+    
+    /* Check for session cookie only - no Basic Auth fallback for web UI */
+    const char *cookie_header = xs_dict_get(headers, "cookie");
+    if (cookie_header != NULL) {
+        xs *cookies = xs_split(cookie_header, ";");
+        const char *cookie;
+        int c = 0;
+        
+        while (xs_list_next(cookies, &cookie, &c)) {
+            xs *trimmed = xs_strip_i(xs_dup(cookie));
+            if (xs_startswith(trimmed, "snac_session=")) {
+                xs *session_id = xs_crop_i(xs_dup(trimmed), 13, 0);
+                const char *uid = session_validate(session_id);
+                
+                if (uid != NULL && strcmp(uid, user->uid) == 0) {
+                    logged_in = 1;
+                    break;
+                }
             }
         }
     }
@@ -186,7 +183,7 @@ xs_html *html_actor_icon(snac *user, xs_dict *actor, const char *date,
                         int in_people, const char *proxy, const char *lang,
                         const char *md5)
 {
-    xs_html *actor_icon = xs_html_tag("p", NULL);
+    xs_html *actor_icon = xs_html_tag("div", NULL);
 
     xs *avatar = NULL;
     const char *v;
@@ -458,11 +455,13 @@ xs_html *html_emoji(snac *user, const char *summary,
     xs_html *form;
     const int react = eid == NULL ? 0 : 1;
 
+    xs *post_ctrl_name = xs_fmt("post_controls_%s", post_id);
+
     xs_html *note = xs_html_tag("div",
         xs_html_tag("details",
+            xs_html_attr("name", post_ctrl_name),
             xs_html_tag("summary",
                 xs_html_text(summary)),
-                xs_html_tag("p", NULL),
                 xs_html_tag("div",
                     xs_html_attr("class", "snac-note"),
                     xs_html_attr("id",    div_id),
@@ -486,8 +485,7 @@ xs_html *html_emoji(snac *user, const char *summary,
                             xs_html_attr("name",    "action"),
                             xs_html_attr("eid",    "action"),
                             xs_html_attr("value",   react ? L("EmojiUnreact") : L("EmojiReact"))),
-                        xs_html_text(" "),
-                    xs_html_tag("p", NULL)))));
+                        xs_html_text(" ")))));
 
     return note;
 }
@@ -508,11 +506,16 @@ xs_html *html_note(snac *user, const char *summary,
 
     xs_html *form;
 
+    /* Determine the control name: use post_controls_<id> for edit/reply, top_controls for new posts */
+    const char *ctrl_post_id = edit_id != NULL ? edit_id : in_reply_to;
+    const char *ctrl_name = ctrl_post_id != NULL ? xs_fmt("post_controls_%s", ctrl_post_id) : "top_controls";
+
     xs_html *note = xs_html_tag("div",
         xs_html_tag("details",
+            xs_html_attr("name", ctrl_name),
             xs_html_tag("summary",
                 xs_html_text(summary)),
-                xs_html_tag("p", NULL),
+                
                 xs_html_tag("div",
                     xs_html_attr("class", "snac-note"),
                     xs_html_attr("id",    div_id),
@@ -530,7 +533,7 @@ xs_html *html_note(snac *user, const char *summary,
                             xs_html_attr("required", "required"),
                             xs_html_attr("placeholder", ta_plh),
                             xs_html_text(ta_content)),
-                        xs_html_tag("p", NULL),
+                        
                         xs_html_text(L("Sensitive content: ")),
                         xs_html_sctag("input",
                             xs_html_attr("type", "checkbox"),
@@ -566,7 +569,7 @@ xs_html *html_note(snac *user, const char *summary,
                 xs_html_attr("value", in_reply_to)));
     else
         xs_html_add(form,
-            xs_html_tag("p", NULL),
+            
             xs_html_text(L("Reply to (URL): ")),
             xs_html_sctag("input",
                 xs_html_attr("type",     "url"),
@@ -574,7 +577,7 @@ xs_html *html_note(snac *user, const char *summary,
                 xs_html_attr("placeholder", L("Optional URL to reply to"))));
 
     xs_html_add(form,
-        xs_html_tag("p", NULL),
+        
         xs_html_tag("span",
             xs_html_attr("title", L("Don't send, but store as a draft")),
             xs_html_text(L("Draft:")),
@@ -611,7 +614,7 @@ xs_html *html_note(snac *user, const char *summary,
         }
 
         xs_html_add(form,
-            xs_html_tag("p", NULL),
+            
             xs_html_text(L("Language:")),
             xs_html_text(" "),
             post_lang);
@@ -664,11 +667,10 @@ xs_html *html_note(snac *user, const char *summary,
     xs_html *att;
 
     xs_html_add(form,
-        xs_html_tag("p", NULL),
+        
         att = xs_html_tag("details",
             xs_html_tag("summary",
-                xs_html_text(L("Attachments..."))),
-            xs_html_tag("p", NULL)));
+                xs_html_text(L("Attachments...")))));
 
     int max_attachments = xs_number_get(xs_dict_get_def(srv_config, "max_attachments", "4"));
     int att_n = 0;
@@ -736,7 +738,7 @@ xs_html *html_note(snac *user, const char *summary,
     /* add poll controls */
     if (poll) {
         xs_html_add(form,
-            xs_html_tag("p", NULL),
+            
             xs_html_tag("details",
                 xs_html_tag("summary",
                     xs_html_text(L("Poll..."))),
@@ -773,12 +775,21 @@ xs_html *html_note(snac *user, const char *summary,
     }
 
     xs_html_add(form,
-        xs_html_tag("p", NULL),
+        
         xs_html_sctag("input",
             xs_html_attr("type",     "submit"),
             xs_html_attr("class",    "button"),
-            xs_html_attr("value",    L("Post"))),
-        xs_html_tag("p", NULL));
+            xs_html_attr("value",    L("Post"))));
+
+    /* Add paste image support script (once per page) */
+    static int paste_script_added = 0;
+    if (!paste_script_added) {
+        xs *script_url = xs_fmt("%s/paste-image.js", srv_baseurl);
+        xs_html_add(form,
+            xs_html_tag("script",
+                xs_html_attr("src", script_url)));
+        paste_script_added = 1;
+    }
 
     return note;
 }
@@ -1108,6 +1119,7 @@ static xs_html *html_user_body(snac *user, int read_only)
         xs *notify_url = xs_fmt("%s/notifications", user->actor);
         xs *people_url = xs_fmt("%s/people", user->actor);
         xs *instance_url = xs_fmt("%s/instance", user->actor);
+    xs *logout_url = xs_fmt("%s/logout", srv_baseurl);
 
         xs_html_add(top_nav,
             xs_html_tag("a",
@@ -1131,6 +1143,10 @@ static xs_html *html_user_body(snac *user, int read_only)
             xs_html_tag("a",
                 xs_html_attr("href", instance_url),
                 xs_html_text(L("instance"))),
+            xs_html_text(" - "),
+            xs_html_tag("a",
+                xs_html_attr("href", logout_url),
+                xs_html_text(L("logout"))),
             xs_html_text(" "),
             xs_html_tag("form",
                 xs_html_attr("style", "display: inline!important"),
@@ -1237,16 +1253,18 @@ static xs_html *html_user_body(snac *user, int read_only)
         if (xs_type(metadata) == XSTYPE_DICT) {
             const xs_str *k;
             const xs_str *v;
-
-            xs_dict *val_links = user->links;
-            if (xs_is_null(val_links))
-                val_links = xs_stock(XSTYPE_DICT);
-
-            xs_html *snac_metadata = xs_html_tag("div",
-                xs_html_attr("class", "snac-metadata"));
-
             int c = 0;
-            while (xs_dict_next(metadata, &k, &v, &c)) {
+
+            /* only render metadata container if there's content */
+            if (xs_dict_next(metadata, &k, &v, &c)) {
+                xs_dict *val_links = user->links;
+                if (xs_is_null(val_links))
+                    val_links = xs_stock(XSTYPE_DICT);
+
+                xs_html *snac_metadata = xs_html_tag("div",
+                    xs_html_attr("class", "snac-metadata"));
+
+                do {
                 xs_html *value;
 
                 if (xs_startswith(v, "https:/") || xs_startswith(v, "http:/") || *v == '@') {
@@ -1307,10 +1325,11 @@ static xs_html *html_user_body(snac *user, int read_only)
                         xs_html_attr("class", "snac-property-value"),
                         value),
                     xs_html_sctag("br", NULL));
-            }
+                } while (xs_dict_next(metadata, &k, &v, &c));
 
-            xs_html_add(top_user,
-                snac_metadata);
+                xs_html_add(top_user,
+                    snac_metadata);
+            }
         }
 
         const char *latitude = xs_dict_get_def(user->config, "latitude", "");
@@ -1365,82 +1384,88 @@ xs_html *html_top_controls(snac *user)
 
         /** operations **/
         xs_html_tag("details",
+            xs_html_attr("name", "top_controls"),
             xs_html_tag("summary",
                 xs_html_text(L("Operations..."))),
-            xs_html_tag("p", NULL),
-            xs_html_tag("form",
-                xs_html_attr("autocomplete", "off"),
-                xs_html_attr("method",       "post"),
-                xs_html_attr("action",       ops_action),
-                xs_html_sctag("input",
-                    xs_html_attr("type",     "text"),
-                    xs_html_attr("name",     "actor"),
-                    xs_html_attr("required", "required"),
-                    xs_html_attr("placeholder", "bob@example.com")),
-                xs_html_text(" "),
-                xs_html_sctag("input",
-                    xs_html_attr("type",    "submit"),
-                    xs_html_attr("name",    "action"),
-                    xs_html_attr("value",   L("Follow"))),
-            xs_html_text(" "),
-            xs_html_text(L("(by URL or user@host)"))),
-            xs_html_tag("p", NULL),
-            xs_html_tag("form",
-                xs_html_attr("autocomplete", "off"),
-                xs_html_attr("method",       "post"),
-                xs_html_attr("action",       ops_action),
-                xs_html_sctag("input",
-                    xs_html_attr("type",     "url"),
-                    xs_html_attr("name",     "id"),
-                    xs_html_attr("required", "required"),
-                    xs_html_attr("placeholder", "https:/" "/fedi.example.com/bob/...")),
-                xs_html_text(" "),
-                xs_html_sctag("input",
-                    xs_html_attr("type",    "submit"),
-                    xs_html_attr("name",    "action"),
-                    xs_html_attr("value",   L("Boost"))),
-                xs_html_text(" "),
-                xs_html_text(L("(by URL)"))),
-            xs_html_tag("p", NULL),
-            xs_html_tag("form",
-                xs_html_attr("autocomplete", "off"),
-                xs_html_attr("method",       "post"),
-                xs_html_attr("action",       ops_action),
-                xs_html_sctag("input",
-                    xs_html_attr("type",     "text"),
-                    xs_html_attr("name",     "id"),
-                    xs_html_attr("required", "required"),
-                    xs_html_attr("placeholder", "https:/" "/fedi.example.com/bob/...")),
-                xs_html_text(" "),
-                xs_html_sctag("input",
-                    xs_html_attr("type",    "submit"),
-                    xs_html_attr("name",    "action"),
-                    xs_html_attr("value",   L("Like"))),
-                xs_html_text(" "),
-                xs_html_text(L("(by URL)"))),
-            xs_html_tag("form",
-                xs_html_attr("autocomplete", "off"),
-                xs_html_attr("method",       "post"),
-                xs_html_attr("action",       ops_action),
-                xs_html_sctag("input",
-                    xs_html_attr("type",     "text"),
-                    xs_html_attr("name",     "eid"),
-                    xs_html_attr("required", "required"),
-                    xs_html_attr("placeholder", ":neocat:")),
-                xs_html_text(" "),
-                xs_html_sctag("input",
-                    xs_html_attr("type",     "text"),
-                    xs_html_attr("name",     "id"),
-                    xs_html_attr("required", "required"),
-                    xs_html_attr("placeholder", "https:/" "/fedi.example.com/bob/...")),
-                xs_html_text(" "),
-                xs_html_sctag("input",
-                    xs_html_attr("type",    "submit"),
-                    xs_html_attr("name",    "action"),
-                    xs_html_attr("value",   L("EmojiReact"))),
-                xs_html_text(" "),
-                xs_html_text(L("(by URL)"))),
-            xs_html_tag("p", NULL)));
+
+                //wrap the details content in a div to avoid style issues
+            xs_html_tag("div",
+                xs_html_attr("class", "snac-operations"),
+
+                    
+                    xs_html_tag("form",
+                        xs_html_attr("autocomplete", "off"),
+                        xs_html_attr("method",       "post"),
+                        xs_html_attr("action",       ops_action),
+                        xs_html_sctag("input",
+                            xs_html_attr("type",     "text"),
+                            xs_html_attr("name",     "actor"),
+                            xs_html_attr("required", "required"),
+                            xs_html_attr("placeholder", "bob@example.com")),
+                        xs_html_text(" "),
+                        xs_html_sctag("input",
+                            xs_html_attr("type",    "submit"),
+                            xs_html_attr("name",    "action"),
+                            xs_html_attr("value",   L("Follow"))),
+                    xs_html_text(" "),
+                    xs_html_text(L("(by URL or user@host)"))),
+                    
+                    xs_html_tag("form",
+                        xs_html_attr("autocomplete", "off"),
+                        xs_html_attr("method",       "post"),
+                        xs_html_attr("action",       ops_action),
+                        xs_html_sctag("input",
+                            xs_html_attr("type",     "url"),
+                            xs_html_attr("name",     "id"),
+                            xs_html_attr("required", "required"),
+                            xs_html_attr("placeholder", "https:/" "/fedi.example.com/bob/...")),
+                        xs_html_text(" "),
+                        xs_html_sctag("input",
+                            xs_html_attr("type",    "submit"),
+                            xs_html_attr("name",    "action"),
+                            xs_html_attr("value",   L("Boost"))),
+                        xs_html_text(" "),
+                        xs_html_text(L("(by URL)"))),
+                    
+                    xs_html_tag("form",
+                        xs_html_attr("autocomplete", "off"),
+                        xs_html_attr("method",       "post"),
+                        xs_html_attr("action",       ops_action),
+                        xs_html_sctag("input",
+                            xs_html_attr("type",     "text"),
+                            xs_html_attr("name",     "id"),
+                            xs_html_attr("required", "required"),
+                            xs_html_attr("placeholder", "https:/" "/fedi.example.com/bob/...")),
+                        xs_html_text(" "),
+                        xs_html_sctag("input",
+                            xs_html_attr("type",    "submit"),
+                            xs_html_attr("name",    "action"),
+                            xs_html_attr("value",   L("Like"))),
+                        xs_html_text(" "),
+                        xs_html_text(L("(by URL)"))),
+                    
+                    xs_html_tag("form",
+                        xs_html_attr("autocomplete", "off"),
+                        xs_html_attr("method",       "post"),
+                        xs_html_attr("action",       ops_action),
+                        xs_html_sctag("input",
+                            xs_html_attr("type",     "text"),
+                            xs_html_attr("name",     "eid"),
+                            xs_html_attr("required", "required"),
+                            xs_html_attr("placeholder", ":neocat:")),
+                        xs_html_text(" "),
+                        xs_html_sctag("input",
+                            xs_html_attr("type",     "text"),
+                            xs_html_attr("name",     "id"),
+                            xs_html_attr("required", "required"),
+                            xs_html_attr("placeholder", "https:/" "/fedi.example.com/bob/...")),
+                        xs_html_text(" "),
+                        xs_html_sctag("input",
+                            xs_html_attr("type",    "submit"),
+                            xs_html_attr("name",    "action"),
+                            xs_html_attr("value",   L("EmojiReact"))),
+                        xs_html_text(" "),
+                        xs_html_text(L("(by URL)"))))));
 
     /** user settings **/
 
@@ -1564,6 +1589,7 @@ xs_html *html_top_controls(snac *user)
 
     xs_html_add(top_controls,
         xs_html_tag("details",
+            xs_html_attr("name", "top_controls"),
         xs_html_tag("summary",
             xs_html_text(L("User Settings..."))),
         xs_html_tag("div",
@@ -1795,9 +1821,7 @@ xs_html *html_top_controls(snac *user)
                 xs_html_sctag("input",
                     xs_html_attr("type", "submit"),
                     xs_html_attr("class", "button"),
-                    xs_html_attr("value", L("Update user info"))),
-
-                xs_html_tag("p", NULL)))));
+                    xs_html_attr("value", L("Update user info")))))));
 
     xs *followed_hashtags_action = xs_fmt("%s/admin/followed-hashtags", user->actor);
     xs *followed_hashtags = xs_join(xs_dict_get_def(user->config,
@@ -1805,11 +1829,13 @@ xs_html *html_top_controls(snac *user)
 
     xs_html_add(top_controls,
         xs_html_tag("details",
+            xs_html_attr("name", "top_controls"),
         xs_html_tag("summary",
             xs_html_text(L("Followed hashtags..."))),
-        xs_html_tag("p",
-            xs_html_text(L("One hashtag per line"))),
+
         xs_html_tag("div",
+            xs_html_tag("div",
+                xs_html_text(L("One hashtag per line"))),
             xs_html_attr("class", "snac-followed-hashtags"),
             xs_html_tag("form",
                 xs_html_attr("autocomplete", "off"),
@@ -1838,11 +1864,13 @@ xs_html *html_top_controls(snac *user)
 
     xs_html_add(top_controls,
         xs_html_tag("details",
+            xs_html_attr("name", "top_controls"),
         xs_html_tag("summary",
             xs_html_text(L("Blocked hashtags..."))),
-        xs_html_tag("p",
-            xs_html_text(L("One hashtag per line"))),
+
         xs_html_tag("div",
+            xs_html_tag("div",
+                xs_html_text(L("One hashtag per line"))),
             xs_html_attr("class", "snac-blocked-hashtags"),
             xs_html_tag("form",
                 xs_html_attr("autocomplete", "off"),
@@ -2045,7 +2073,7 @@ xs_html *html_entry_controls(snac *user, const char *actor,
                 L("Block any activity from this user forever")));
     }
 
-    if (!xs_is_true(xs_dict_get(srv_config, "hide_delete_post_button")))
+    if (!xs_is_true(xs_dict_get(srv_config, "hide_delete_post_button")) && is_msg_mine(user, id))
         xs_html_add(form,
             html_button("delete", L("Delete"), L("Delete this post")));
 
@@ -2091,7 +2119,7 @@ xs_html *html_entry_controls(snac *user, const char *actor,
         const int edit_scope = get_msg_visibility(msg);
 
         xs_html_add(controls, xs_html_tag("div",
-            xs_html_tag("p", NULL),
+            
             html_note(user, L("Edit..."),
                 div_id, form_id,
                 "", prev_src,
@@ -2100,23 +2128,23 @@ xs_html *html_entry_controls(snac *user, const char *actor,
                 edit_scope, redir,
                 NULL, 0, att_files, att_alt_texts, is_draft(user, id),
                 xs_dict_get(msg, "published"), note_lang)),
-            xs_html_tag("p", NULL));
+            xs_html_tag("div", NULL));
     }
 
     if (!xs_is_true(xs_dict_get(srv_config, "disable_emojireact"))) { /** emoji react **/
         /* the post textarea */
-        xs *div_id  = xs_fmt("%s_reply", md5);
-        xs *form_id = xs_fmt("%s_reply_form", md5);
+        xs *div_id  = xs_fmt("%s_emojireact", md5);
+        xs *form_id = xs_fmt("%s_emojireact_form", md5);
         xs *e_react = emoji_reacted(user, id);
 
         xs_html_add(controls, xs_html_tag("div",
-            xs_html_tag("p", NULL),
+            
             html_emoji(
                 user, L("Emoji react..."),
                 div_id, form_id,
                 ":neocat:", id,
                 e_react)),
-            xs_html_tag("p", NULL));
+            xs_html_tag("div", NULL));
     }
 
     { /** reply **/
@@ -2129,7 +2157,7 @@ xs_html *html_entry_controls(snac *user, const char *actor,
         const int scope = get_msg_visibility(msg);
 
         xs_html_add(controls, xs_html_tag("div",
-            xs_html_tag("p", NULL),
+            
             html_note(user, L("Reply..."),
                 div_id, form_id,
                 "", ct,
@@ -2137,7 +2165,7 @@ xs_html *html_entry_controls(snac *user, const char *actor,
                 xs_dict_get(msg, "sensitive"), xs_dict_get(msg, "summary"),
                 scope, redir,
                 id, 0, NULL, NULL, 0, NULL, NULL)),
-            xs_html_tag("p", NULL));
+            xs_html_tag("div", NULL));
     }
 
     return controls;
@@ -2574,7 +2602,7 @@ xs_html *html_entry(snac *user, xs_dict *msg, int read_only,
                         xs *s1;
                         if (user) {
                             xs *action = xs_fmt("%s/admin/action", user->actor);
-                            xs *form_id = xs_fmt("%s_reply_form", md5);
+                            xs *form_id = xs_fmt("%s_emoji_%s_form", md5, shortname);
 
                             xs_html *form =
                                 xs_html_tag("form",
@@ -2793,7 +2821,7 @@ xs_html *html_entry(snac *user, xs_dict *msg, int read_only,
             }
 
             xs_html_add(form,
-                xs_html_tag("p", NULL),
+                
                 xs_html_sctag("input",
                     xs_html_attr("type", "submit"),
                     xs_html_attr("class", "button"),
@@ -3259,14 +3287,10 @@ xs_html *html_footer(const snac *user)
         xs_html_attr("class", "snac-footer"),
         xs_html_tag("a",
             xs_html_attr("href", srv_baseurl),
-            xs_html_text(L("about this site"))),
-        xs_html_text(" - "),
-        xs_html_text(L("powered by ")),
-        xs_html_tag("a",
-            xs_html_attr("href", WHAT_IS_SNAC_URL),
-            xs_html_tag("abbr",
-                xs_html_attr("title", "Social Networks Are Crap"),
-                xs_html_text(USER_AGENT))));
+            xs_html_text(L("about this site")))
+        );
+        
+        
 }
 
 
@@ -3604,10 +3628,10 @@ xs_html *html_people_list(snac *user, xs_list *list, const char *header, const c
         xs_html_tag("h2",
             xs_html_attr("class", "snac-header"),
             xs_html_text(header)),
-        snac_posts = xs_html_tag("details",
-                xs_html_attr("open", NULL),
-                xs_html_tag("summary",
-                    xs_html_text("..."))));
+        xs_html_tag("div",
+            xs_html_attr("class", "snac-people-list"),
+            snac_posts = xs_html_tag("div",
+                xs_html_attr("class", "snac-people-items"))));
 
     xs *redir = xs_fmt("%s/people", user->actor);
 
@@ -3805,10 +3829,10 @@ xs_html *html_people_list(snac *user, xs_list *list, const char *header, const c
 
             /* the post textarea */
             xs *dm_div_id  = xs_fmt("%s_%s_dm", md5, t);
-            xs *dm_form_id = xs_fmt("%s_reply_form", md5);
+            xs *dm_form_id = xs_fmt("%s_dm_form", md5);
 
             xs_html_add(snac_controls,
-                xs_html_tag("p", NULL),
+                
                 html_note(user, L("Direct Message..."),
                     dm_div_id, dm_form_id,
                     "", "",
@@ -3816,7 +3840,7 @@ xs_html *html_people_list(snac *user, xs_list *list, const char *header, const c
                     xs_stock(XSTYPE_FALSE), "",
                     SCOPE_MENTIONED, NULL,
                     NULL, 0, NULL, NULL, 0, NULL, NULL),
-                xs_html_tag("p", NULL));
+                xs_html_tag("div", NULL));
 
             xs_html_add(snac_post, snac_controls);
 
@@ -4454,8 +4478,10 @@ int html_get_handler(const xs_dict *req, const char *q_path,
     else
     if (strcmp(p_path, "admin") == 0) { /** private timeline **/
         if (!login(&snac, req)) {
-            *body  = xs_dup(uid);
-            status = HTTP_STATUS_UNAUTHORIZED;
+            /* redirect to login page */
+            xs *login_url = xs_fmt("%s/login?redir=/%s/admin", srv_baseurl, uid);
+            *body  = xs_dup(login_url);
+            status = HTTP_STATUS_SEE_OTHER;
         }
         else {
             const char *q = NULL;
@@ -4640,8 +4666,9 @@ int html_get_handler(const xs_dict *req, const char *q_path,
     else
     if (xs_startswith(p_path, "admin/p/")) { /** unique post by md5 **/
         if (!login(&snac, req)) {
-            *body  = xs_dup(uid);
-            status = HTTP_STATUS_UNAUTHORIZED;
+            xs *login_url = xs_fmt("%s/login?redir=/%s/%s", srv_baseurl, uid, p_path);
+            *body  = xs_dup(login_url);
+            status = HTTP_STATUS_SEE_OTHER;
         }
         else {
             xs *l = xs_split(p_path, "/");
@@ -4660,8 +4687,9 @@ int html_get_handler(const xs_dict *req, const char *q_path,
     else
     if (strcmp(p_path, "people") == 0) { /** the list of people **/
         if (!login(&snac, req)) {
-            *body  = xs_dup(uid);
-            status = HTTP_STATUS_UNAUTHORIZED;
+            xs *login_url = xs_fmt("%s/login?redir=/%s/people", srv_baseurl, uid);
+            *body  = xs_dup(login_url);
+            status = HTTP_STATUS_SEE_OTHER;
         }
         else {
             *body   = html_people(&snac);
@@ -4672,8 +4700,9 @@ int html_get_handler(const xs_dict *req, const char *q_path,
     else
     if (xs_startswith(p_path, "people/")) { /** a single actor **/
         if (!login(&snac, req)) {
-            *body  = xs_dup(uid);
-            status = HTTP_STATUS_UNAUTHORIZED;
+            xs *login_url = xs_fmt("%s/login?redir=/%s/%s", srv_baseurl, uid, p_path);
+            *body  = xs_dup(login_url);
+            status = HTTP_STATUS_SEE_OTHER;
         }
         else {
             xs *actor_dict = NULL;
@@ -4703,8 +4732,9 @@ int html_get_handler(const xs_dict *req, const char *q_path,
     else
     if (strcmp(p_path, "notifications") == 0) { /** the list of notifications **/
         if (!login(&snac, req)) {
-            *body  = xs_dup(uid);
-            status = HTTP_STATUS_UNAUTHORIZED;
+            xs *login_url = xs_fmt("%s/login?redir=/%s/notifications", srv_baseurl, uid);
+            *body  = xs_dup(login_url);
+            status = HTTP_STATUS_SEE_OTHER;
         }
         else {
             *body   = html_notifications(&snac, skip, show);
@@ -4715,8 +4745,9 @@ int html_get_handler(const xs_dict *req, const char *q_path,
     else
     if (strcmp(p_path, "instance") == 0) { /** instance timeline **/
         if (!login(&snac, req)) {
-            *body  = xs_dup(uid);
-            status = HTTP_STATUS_UNAUTHORIZED;
+            xs *login_url = xs_fmt("%s/login?redir=/%s/instance", srv_baseurl, uid);
+            *body  = xs_dup(login_url);
+            status = HTTP_STATUS_SEE_OTHER;
         }
         else {
             xs *list = timeline_instance_list(skip, show);
@@ -4731,8 +4762,9 @@ int html_get_handler(const xs_dict *req, const char *q_path,
     else
     if (strcmp(p_path, "pinned") == 0) { /** list of pinned posts **/
         if (!login(&snac, req)) {
-            *body  = xs_dup(uid);
-            status = HTTP_STATUS_UNAUTHORIZED;
+            xs *login_url = xs_fmt("%s/login?redir=/%s/pinned", srv_baseurl, uid);
+            *body  = xs_dup(login_url);
+            status = HTTP_STATUS_SEE_OTHER;
         }
         else {
             xs *list = pinned_list(&snac);
@@ -4746,8 +4778,9 @@ int html_get_handler(const xs_dict *req, const char *q_path,
     else
     if (strcmp(p_path, "bookmarks") == 0) { /** list of bookmarked posts **/
         if (!login(&snac, req)) {
-            *body  = xs_dup(uid);
-            status = HTTP_STATUS_UNAUTHORIZED;
+            xs *login_url = xs_fmt("%s/login?redir=/%s/bookmarks", srv_baseurl, uid);
+            *body  = xs_dup(login_url);
+            status = HTTP_STATUS_SEE_OTHER;
         }
         else {
             xs *list = bookmark_list(&snac);
@@ -4761,8 +4794,9 @@ int html_get_handler(const xs_dict *req, const char *q_path,
     else
     if (strcmp(p_path, "drafts") == 0) { /** list of drafts **/
         if (!login(&snac, req)) {
-            *body  = xs_dup(uid);
-            status = HTTP_STATUS_UNAUTHORIZED;
+            xs *login_url = xs_fmt("%s/login?redir=/%s/drafts", srv_baseurl, uid);
+            *body  = xs_dup(login_url);
+            status = HTTP_STATUS_SEE_OTHER;
         }
         else {
             xs *list = draft_list(&snac);
@@ -4776,8 +4810,9 @@ int html_get_handler(const xs_dict *req, const char *q_path,
     else
     if (strcmp(p_path, "sched") == 0) { /** list of scheduled posts **/
         if (!login(&snac, req)) {
-            *body  = xs_dup(uid);
-            status = HTTP_STATUS_UNAUTHORIZED;
+            xs *login_url = xs_fmt("%s/login?redir=/%s/sched", srv_baseurl, uid);
+            *body  = xs_dup(login_url);
+            status = HTTP_STATUS_SEE_OTHER;
         }
         else {
             xs *list = scheduled_list(&snac);
@@ -4964,8 +4999,9 @@ int html_get_handler(const xs_dict *req, const char *q_path,
     else
     if (strcmp(p_path, "share") == 0) { /** direct post **/
         if (!login(&snac, req)) {
-            *body  = xs_dup(uid);
-            status = HTTP_STATUS_UNAUTHORIZED;
+            xs *login_url = xs_fmt("%s/login?redir=/%s/share", srv_baseurl, uid);
+            *body  = xs_dup(login_url);
+            status = HTTP_STATUS_SEE_OTHER;
         }
         else {
             const char *b64 = xs_dict_get(q_vars, "content");
@@ -4988,8 +5024,9 @@ int html_get_handler(const xs_dict *req, const char *q_path,
     else
     if (strcmp(p_path, "authorize_interaction") == 0) { /** follow, like or boost from Mastodon **/
         if (!login(&snac, req)) {
-            *body  = xs_dup(uid);
-            status = HTTP_STATUS_UNAUTHORIZED;
+            xs *login_url = xs_fmt("%s/login?redir=/%s/authorize_interaction", srv_baseurl, uid);
+            *body  = xs_dup(login_url);
+            status = HTTP_STATUS_SEE_OTHER;
         }
         else {
             status = HTTP_STATUS_NOT_FOUND;
@@ -5072,8 +5109,9 @@ int html_post_handler(const xs_dict *req, const char *q_path,
     /* all posts must be authenticated */
     if (!login(&snac, req)) {
         user_free(&snac);
-        *body  = xs_dup(uid);
-        return HTTP_STATUS_UNAUTHORIZED;
+        xs *login_url = xs_fmt("%s/login?redir=/%s/admin", srv_baseurl, uid);
+        *body  = xs_dup(login_url);
+        return HTTP_STATUS_SEE_OTHER;
     }
 
     user = &snac; /* for L() */

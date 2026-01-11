@@ -213,6 +213,28 @@ const char * const authorize_interaction_page = ""
 "</form><p>%s</p></body></html>\n"
 "";
 
+const char * const form_login_page = ""
+"<!DOCTYPE html>\n"
+"<html>\n"
+"<head>\n"
+"<title>Login - %s</title>\n"
+"<meta content=\"width=device-width, initial-scale=1, minimum-scale=1, user-scalable=no\" name=\"viewport\">\n"
+"<link rel=\"stylesheet\" type=\"text/css\" href=\"%s/style.css\"/>\n"
+"<style>:root {color-scheme: light dark}</style>\n"
+"</head>\n"
+"<body>\n"
+"<div style=\"max-width: 400px; margin: 50px auto; padding: 20px;\">\n"
+"<h1>Login to snac</h1>\n"
+"%s"  /* error message placeholder */
+"<form method=\"post\" action=\"%s/login\">\n"
+"<p><label>Username:<br><input type=\"text\" name=\"username\" autocapitalize=\"off\" required=\"required\" style=\"width: 100%%; padding: 8px;\"></label></p>\n"
+"<p><label>Password:<br><input type=\"password\" name=\"password\" required=\"required\" style=\"width: 100%%; padding: 8px;\"></label></p>\n"
+"<input type=\"hidden\" name=\"redir\" value=\"%s\">\n"
+"<p><input type=\"submit\" value=\"Login\" style=\"padding: 10px 20px;\"></p>\n"
+"</form>\n"
+"</div>\n"
+"</body></html>\n"
+"";
 
 int server_get_handler(xs_dict *req, const char *q_path,
                        char **body, int *b_size, char **ctype)
@@ -338,6 +360,19 @@ int server_get_handler(xs_dict *req, const char *q_path,
         }
     }
     else
+    if (strcmp(q_path, "/paste-image.js") == 0) {
+        FILE *f;
+        xs *js_fn = xs_fmt("%s/paste-image.js", srv_basedir);
+
+        if ((f = fopen(js_fn, "r")) != NULL) {
+            *body = xs_readall(f);
+            fclose(f);
+
+            status = HTTP_STATUS_OK;
+            *ctype = "application/javascript";
+        }
+    }
+    else
     if (strcmp(q_path, "/share") == 0) {
         const xs_dict *q_vars = xs_dict_get(req, "q_vars");
         const char *url  = xs_dict_get(q_vars, "url");
@@ -389,6 +424,47 @@ int server_get_handler(xs_dict *req, const char *q_path,
 
     if (status != 0)
         srv_debug(1, xs_fmt("server_get_handler serving '%s' %d", q_path, status));
+    /* handle /login GET request */
+    if (status == 0 && strcmp(q_path, "/login") == 0) {
+        const xs_dict *q_vars = xs_dict_get(req, "q_vars");
+        const char *redir = xs_dict_get_def(q_vars, "redir", "/");
+        
+        *body = xs_fmt(form_login_page, 
+            xs_dict_get(srv_config, "host"),
+            srv_baseurl,
+            "",  /* no error message */
+            srv_baseurl,
+            redir);
+        
+        *b_size = strlen(*body);
+        status = HTTP_STATUS_OK;
+    }
+
+    /* handle /logout GET request */
+    if (status == 0 && strcmp(q_path, "/logout") == 0) {
+        const char *cookie_header = xs_dict_get(req, "cookie");
+
+        if (cookie_header != NULL) {
+            xs *cookies = xs_split(cookie_header, ";");
+            const char *cookie;
+            int c = 0;
+    
+            while (xs_list_next(cookies, &cookie, &c)) {
+                xs *trimmed = xs_strip_i(xs_dup(cookie));
+                if (xs_startswith(trimmed, "snac_session=")) {
+                    xs *session_id = xs_crop_i(xs_dup(trimmed), 13, 0);
+                    session_destroy(session_id);
+                    break;
+                }
+            }
+        }
+
+        /* Redirect to home page - the Set-Cookie header will be added in httpd_connection */
+        *body = xs_dup(srv_baseurl);
+        *b_size = strlen(*body);
+        status = HTTP_STATUS_SEE_OTHER;
+    }
+
 
     return status;
 }
@@ -400,11 +476,81 @@ int server_post_handler(const xs_dict *req, const char *q_path,
 {
     int status = 0;
 
-    (void)payload;
-    (void)p_size;
-    (void)body;
-    (void)b_size;
-    (void)ctype;
+    /* handle /login POST request */
+    if (strcmp(q_path, "/login") == 0) {
+        const xs_dict *p_vars = xs_dict_get(req, "p_vars");
+        const char *username = xs_dict_get(p_vars, "username");
+        const char *password = xs_dict_get(p_vars, "password");
+        const char *redir = xs_dict_get_def(p_vars, "redir", "/");
+        const char *addr = xs_or(xs_dict_get(req, "remote-addr"),
+                                 xs_dict_get(req, "x-forwarded-for"));
+        
+        if (xs_is_string(username) && xs_is_string(password)) {
+            snac user;
+            
+            if (user_open(&user, username) != 0) {
+                if (badlogin_check(username, addr) && 
+                    check_password(username, password, xs_dict_get(user.config, "passwd"))) {
+                    
+                    /* successful login - create session */
+                    char *session_id = session_create(username);
+                    
+                    if (session_id != NULL) {
+                        /* Store session ID in body with special prefix for header extraction */
+                        xs *location = xs_fmt("%s%s", srv_baseurl, redir);
+                        *body = xs_fmt("SNAC_SET_COOKIE:%s|%s", session_id, location);
+                        *b_size = strlen(*body);
+                        status = HTTP_STATUS_SEE_OTHER;
+                        
+                        lastlog_write(&user, "web");
+                        free(session_id);
+                    }
+                    else {
+                        /* session creation failed */
+                        *body = xs_fmt(form_login_page, 
+                            xs_dict_get(srv_config, "host"),
+                            srv_baseurl,
+                            "<p style=\"color: red;\">Login failed: session error</p>",
+                            srv_baseurl,
+                            redir);
+                        *b_size = strlen(*body);
+                        status = HTTP_STATUS_OK;
+                    }
+                }
+                else {
+                    /* bad password or too many failed attempts */
+                    badlogin_inc(username, addr);
+                    
+                    *body = xs_fmt(form_login_page, 
+                        xs_dict_get(srv_config, "host"),
+                        srv_baseurl,
+                        "<p style=\"color: red;\">Login failed: invalid credentials</p>",
+                        srv_baseurl,
+                        redir);
+                    *b_size = strlen(*body);
+                    status = HTTP_STATUS_OK;
+                }
+                
+                user_free(&user);
+            }
+            else {
+                /* user not found */
+                *body = xs_fmt(form_login_page, 
+                    xs_dict_get(srv_config, "host"),
+                    srv_baseurl,
+                    "<p style=\"color: red;\">Login failed: user not found</p>",
+                    srv_baseurl,
+                    redir);
+                *b_size = strlen(*body);
+                status = HTTP_STATUS_OK;
+            }
+        }
+        else {
+            status = HTTP_STATUS_BAD_REQUEST;
+        }
+        
+        return status;
+    }
 
     if (strcmp(q_path, "/webmention-hook") == 0) {
         status = HTTP_STATUS_BAD_REQUEST;
@@ -604,8 +750,30 @@ void httpd_connection(FILE *f)
     if (status == HTTP_STATUS_BAD_REQUEST && body != NULL)
         body = xs_str_new("<h1>400 Bad Request (" USER_AGENT ")</h1>");
 
-    if (status == HTTP_STATUS_SEE_OTHER)
-        headers = xs_dict_append(headers, "location", body);
+    if (status == HTTP_STATUS_SEE_OTHER) {
+        /* Check if body contains SNAC_SET_COOKIE marker for login redirect */
+        if (body && xs_startswith(body, "SNAC_SET_COOKIE:")) {
+            xs *cookie_and_loc = xs_dup(body);
+            xs *parts = xs_split(cookie_and_loc, "|");
+            if (xs_list_len(parts) == 2) {
+                xs *cookie_part = xs_crop_i(xs_dup(xs_list_get(parts, 0)), 16, 0);
+                xs *location = xs_dup(xs_list_get(parts, 1));
+                
+                xs *cookie_header = xs_fmt("snac_session=%s; Path=/; HttpOnly; SameSite=Lax; Max-Age=%d", cookie_part, SESSION_TIMEOUT);
+                headers = xs_dict_append(headers, "set-cookie", cookie_header);
+                headers = xs_dict_append(headers, "location", location);
+                
+                body = xs_dup(location);
+            }
+        } else {
+            headers = xs_dict_append(headers, "location", body);
+        }
+        
+        /* If this is a logout request, clear the session cookie */
+        if (strcmp(q_path, "/logout") == 0) {
+            headers = xs_dict_append(headers, "set-cookie", "snac_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0");
+        }
+    }
 
     if (status == HTTP_STATUS_UNAUTHORIZED && body) {
         xs *www_auth = xs_fmt("Basic realm=\"@%s@%s snac login\"",
@@ -648,8 +816,8 @@ void httpd_connection(FILE *f)
     headers = xs_dict_append(headers, "access-control-allow-headers", "*");
     headers = xs_dict_append(headers, "access-control-expose-headers", "Link");
 
-    /* disable any form of fucking JavaScript */
-    headers = xs_dict_append(headers, "Content-Security-Policy", "script-src ;");
+    /* allow scripts from same origin for paste image functionality */
+    headers = xs_dict_append(headers, "Content-Security-Policy", "script-src 'self';");
 
     if (p_state->use_fcgi)
         xs_fcgi_response(f, status, headers, body, b_size, fcgi_id);
@@ -1053,6 +1221,9 @@ void httpd(void)
     signal(SIGPIPE, SIG_IGN);
     signal(SIGTERM, term_handler);
     signal(SIGINT,  term_handler);
+
+    /* initialize session management */
+    session_init();
 
     srv_log(xs_fmt("httpd%s start %s %s", p_state->use_fcgi ? " (FastCGI)" : "",
                     full_address, USER_AGENT));

@@ -1518,8 +1518,31 @@ int timeline_del(snac *snac, const char *id)
     unpin(snac, id);
     unbookmark(snac, id);
 
-    /* try to delete the object if it's not used elsewhere */
-    return object_del_if_unref(id);
+    /* also delete any attachments referenced in this object */
+    xs *msg = NULL;
+    if (valid_status(object_get(id, &msg))) {
+        const xs_list *attachments = xs_dict_get(msg, "attachment");
+        
+        if (xs_is_list(attachments)) {
+            const xs_dict *att;
+            int c = 0;
+            
+            while (xs_list_next(attachments, (const xs_val **)&att, &c)) {
+                if (xs_is_dict(att)) {
+                    const char *url = xs_dict_get(att, "url");
+                    
+                    if (xs_is_string(url) && xs_startswith(url, snac->actor)) {
+                        /* extract the filename from the URL (e.g., /s/filename) */
+                        xs *fn = xs_fmt("%s%s", snac->basedir, url + strlen(snac->actor));
+                        unlink(fn);
+                    }
+                }
+            }
+        }
+    }
+
+    /* delete the object */
+    return object_del(id);
 }
 
 

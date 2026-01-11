@@ -3,7 +3,7 @@
 
 #define VERSION "2.87"
 
-#define USER_AGENT "snac/" VERSION
+#define USER_AGENT "abbysocial/snac/" VERSION
 
 #define WHAT_IS_SNAC_URL "https:/" "/comam.es/what-is-snac"
 #define SNAC_DOC_URL "https:/" "/comam.es/snac-doc"
@@ -28,6 +28,8 @@
 #define MD5_HEX_SIZE 33
 
 #define MD5_ALREADY_SEEN_MARK "00000000000000000000000000000000"
+
+#define SESSION_TIMEOUT 8640000  /* 100 days */
 
 extern double disk_layout;
 extern xs_str *srv_basedir;
@@ -75,6 +77,14 @@ typedef struct {
     int n_threads;          /* number of configured threads */
     enum { THST_STOP, THST_WAIT, THST_IN, THST_QUEUE } th_state[MAX_THREADS];
 } srv_state;
+typedef struct session_entry {
+    char session_id[65];
+    char uid[256];
+    time_t created;
+    time_t last_access;
+    struct session_entry *next;
+} session_entry;
+
 
 extern srv_state *p_state;
 
@@ -485,6 +495,13 @@ xs_str *make_url(const char *href, const char *proxy, int by_token);
 
 int badlogin_check(const char *user, const char *addr);
 void badlogin_inc(const char *user, const char *addr);
+/* session management */
+void session_init(void);
+char *session_create(const char *uid);
+const char *session_validate(const char *session_id);
+void session_destroy(const char *session_id);
+void session_cleanup(void);
+
 
 const char *lang_str(const char *str, const snac *user);
 

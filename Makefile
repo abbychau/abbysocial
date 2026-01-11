@@ -4,8 +4,8 @@ CFLAGS?=-g -Wall -Wextra -pedantic
 
 all: snac
 
-snac: snac.o main.o sandbox.o data.o http.o httpd.o webfinger.o \
-    activitypub.o html.o utils.o format.o upgrade.o mastoapi.o rss.o
+snac: snac.o main.o sandbox.o data.o http.o httpd.o webfinger.o session.o \
+	activitypub.o html.o utils.o format.o upgrade.o mastoapi.o rss.o
 	$(CC) $(CFLAGS) -L$(PREFIX)/lib *.o -lcurl -lcrypto $(LDFLAGS) -pthread -o $@
 
 test: tests/smtp

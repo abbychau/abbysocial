@@ -1,4 +1,7 @@
 **/*.o
 tests/smtp
 snac
-data/
+data/*
+logs/
+!data/style.css
+!data/paste-image.js

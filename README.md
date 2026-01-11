@@ -1,3 +1,17 @@
+# AbbySocial
+
+A snac fork with Chinese localization and minor improvements.
+
+- instance timeline will hide delete button for non-authors
+- also delete any attachments referenced by the deleted post, instead of current rolling back
+- paste-image.js included, allowing image pasting from clipboard in post composition
+- a sane style.css 
+- zh_TW localization
+- various private page xs_html structure fixes and improvements
+
+
+upstream: https://codeberg.org/grunfink/snac2
+
 # snac
 
 A simple, minimalistic ActivityPub instance
