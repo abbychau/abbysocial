@@ -10,7 +10,10 @@ Aim to provide a better experience and less visual clutter when using snac. Rich
 - paste-image.js included, allowing image pasting from clipboard in post composition
 - a sane style.css 
 - zh_TW localization
-- various private page xs_html structure fixes and improvements
+- various page xs_html structure fixes and improvements
+- replaced basic auth with session
+
+
 
 
 

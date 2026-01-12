@@ -2,7 +2,7 @@
 
 ## Open
 
-It seems that Microsoft is planning to laminate Basic HTTP Auth, so make a plan, see https://codeberg.org/grunfink/snac2/issues/350
+
 
 Investigate the problem with boosts inside the same instance (see https://codeberg.org/grunfink/snac2/issues/214).
 
@@ -31,6 +31,8 @@ Integrate "Added handling for International Domain Names" PR https://codeberg.or
 The 'history' pages are just monthly HTML snapshots of the local timeline. This is ok and cheap and easy, but is problematic if you e.g. intentionally delete a post because it will remain there in the history forever. If you activate local timeline purging, purged entries will remain in the history as 'ghosts', which may or may not be what the user wants.
 
 ## Closed
+
+It seems that Microsoft is planning to laminate Basic HTTP Auth, so make a plan, see https://codeberg.org/grunfink/snac2/issues/350 (2026-01-11T18:26:28+0100) @ AbbySocial.
 
 Start a TODO file (2022-08-25T10:07:44+0200).
 

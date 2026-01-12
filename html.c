@@ -637,7 +637,6 @@ xs_html *html_note(snac *user, const char *summary,
         xs *pdat = xs_fmt(L("Post date and time (timezone: %s):"), user->tz);
 
         xs_html_add(form,
-            xs_html_tag("p",
                 xs_html_tag("details",
                     xs_html_tag("summary",
                         xs_html_text(L("Scheduled post..."))),
@@ -653,7 +652,7 @@ xs_html *html_note(snac *user, const char *summary,
                             xs_html_attr("type",  "time"),
                             xs_html_attr("value", post_time ? post_time : ""),
                             xs_html_attr("step",  "1"),
-                            xs_html_attr("name",  "post_time"))))));
+                            xs_html_attr("name",  "post_time")))));
     }
 
     if (edit_id)
