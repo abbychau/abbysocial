@@ -190,11 +190,17 @@ img {
 }
 input[type=text],
 input[type=url],
+select,option,
 textarea,
 input[type=password] {
     background-color: white;
     color: #333;
 }
+
+button > span {
+    color: #333;
+}
+
 /*This makes buttons look like any other text - this was intended to have surrounding symbols,
 but it doesn't work on inputs, so you may want to re-enable the border for a11y*/
 input[type=submit] {
@@ -368,7 +374,9 @@ details > div {
     z-index: 5;
     border-left: 2px solid #333;
 }
-
+.snac-post{
+    padding-top:1em;
+}
 .snac-post details > div {
     position: static;
 }
@@ -385,6 +393,8 @@ details > div {
 .snac-people-list input[type=text],
 .snac-people-list input[type=url],
 .snac-people-list input[type=checkbox],
+.snac-people-list select,
+.snac-people-list option,
 .snac-people-list textarea {
     color: #555;
 }
@@ -400,4 +410,10 @@ details > div {
     width: 250px;
     padding: 2px;
     margin: 1px;
+}
+.snac-user-setup p {
+    margin: 0.1em 0;
+}
+input[type=url] {
+    border:0;
 }

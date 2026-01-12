@@ -213,7 +213,7 @@ msgstr "總是顯示敏感內容"
 
 #: html.c:1622
 msgid "Email address for notifications:"
-msgstr "用於通知的電子郵箱地址"
+msgstr "用於通知的電子郵箱地址："
 
 #: html.c:1630
 msgid "Telegram notifications (bot key and chat id):"
@@ -764,7 +764,7 @@ msgstr "語言"
 
 #: html.c:1658
 msgid "Notify webhook:"
-msgstr "通知 Webhook:"
+msgstr "通知 Webhook："
 
 #: html.c:1664
 msgid "http://example.com/webhook"
