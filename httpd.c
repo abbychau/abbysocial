@@ -224,7 +224,7 @@ const char * const form_login_page = ""
 "</head>\n"
 "<body>\n"
 "<div style=\"max-width: 400px; margin: 50px auto; padding: 20px;\">\n"
-"<h1>Login to snac</h1>\n"
+"<h1>Login</h1>\n"
 "%s"  /* error message placeholder */
 "<form method=\"post\" action=\"%s/login\">\n"
 "<p><label>Username:<br><input type=\"text\" name=\"username\" autocapitalize=\"off\" required=\"required\" style=\"width: 100%%; padding: 8px;\"></label></p>\n"

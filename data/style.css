@@ -375,7 +375,7 @@ details > div {
     border-left: 2px solid #333;
 }
 .snac-post{
-    padding-top:1em;
+    padding:1em 0;
 }
 .snac-post details > div {
     position: static;
@@ -416,4 +416,19 @@ details > div {
 }
 input[type=url] {
     border:0;
+}
+
+.snac-controls > div {
+    display: inline-block;
+    margin-right: 10px;
+    vertical-align: top;
+}
+
+.snac-controls summary {
+    width: auto !important;
+}
+
+/*opened details style*/
+.snac-controls details[open]  {
+    background-color: #444;
 }

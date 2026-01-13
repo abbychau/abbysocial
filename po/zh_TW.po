@@ -102,7 +102,10 @@ msgstr "RSS"
 
 #: html.c:1080 html.c:1119
 msgid "private"
-msgstr "私密"
+msgstr "個人頁面"
+
+msgid "logout"
+msgstr "登出"
 
 #: html.c:1115
 msgid "public"
@@ -114,7 +117,7 @@ msgstr "通知"
 
 #: html.c:1128
 msgid "people"
-msgstr "成員"
+msgstr "關注者"
 
 #: html.c:1133
 msgid "instance"
@@ -149,7 +152,7 @@ msgstr "你在想什麼？"
 
 #: html.c:1369
 msgid "Operations..."
-msgstr "操作..."
+msgstr "關注、轉發、點贊..."
 
 #: html.c:1384 html.c:2027 html.c:3776 html.c:4044 html.c:5261
 msgid "Follow"
@@ -213,7 +216,7 @@ msgstr "總是顯示敏感內容"
 
 #: html.c:1622
 msgid "Email address for notifications:"
-msgstr "用於通知的電子郵箱地址："
+msgstr "用於通知的電子郵箱地址"
 
 #: html.c:1630
 msgid "Telegram notifications (bot key and chat id):"
@@ -297,7 +300,7 @@ msgstr "說你喜歡這個貼子"
 
 #: html.c:1987 html.c:5219
 msgid "Unlike"
-msgstr "不喜歡"
+msgstr "取消點贊"
 
 #: html.c:1987
 msgid "Nah don't like it that much"

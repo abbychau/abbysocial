@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Abbysocial Admin</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="wrap">
+      <header class="header">
+        <h1>Abbysocial Admin</h1>
+        <p class="muted">Runs allowlisted <code>snac</code> commands against your configured <code>SNAC_BASEDIR</code>.</p>
+      </header>
+
+      <section class="card" id="statusCard">
+        <div class="row">
+          <div>
+            <div class="label">Base dir</div>
+            <div class="mono" id="basedir">(loading…)</div>
+          </div>
+          <div class="right">
+            <button id="refresh">Refresh</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="row">
+          <div class="grow">
+            <label class="label" for="command">Command</label>
+            <select id="command" size="20"></select>
+            <div class="hint" id="commandLabel"></div>
+          </div>
+        </div>
+
+        <div id="args"></div>
+
+        <div class="row">
+          <button id="run" class="primary">Run</button>
+          <span class="hint" id="runHint"></span>
+        </div>
+      </section>
+
+      <section class="card" id="passwordCard" hidden>
+        <div class="row">
+          <div class="grow">
+            <div class="label" id="passwordLabel">Password</div>
+            <div class="passwordRow">
+              <input id="passwordValue" class="mono" readonly />
+              <button id="copyPassword">Copy</button>
+            </div>
+            <div class="hint" id="passwordHint">This password is shown once by snac; store it safely.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="row">
+          <div class="label">Result</div>
+        </div>
+        <pre class="output" id="output">(no output yet)</pre>
+      </section>
+
+      <footer class="footer muted">
+        Tip: your browser will prompt for HTTP Basic Auth on first load.
+      </footer>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

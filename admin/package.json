@@ -1,0 +1,19 @@
+{
+  "name": "abbysocial-admin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Minimal web admin UI to run allowlisted snac commands.",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "SNAC_BASEDIR=/home/abby/ghrepo/snac2/data SNAC_BIN=../snac ADMIN_PASS=admin node server.js",
+    "hash": "node scripts/hash-password.js"
+  },
+  "dependencies": {
+    "cookie-parser": "^1.4.7",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^7.2.0"
+  }
+}

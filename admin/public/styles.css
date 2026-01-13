@@ -1,0 +1,110 @@
+:root {
+  --bg: #0b0d10;
+  --card: #12161c;
+  --text: #e7ebf0;
+  --muted: #9aa6b2;
+  --border: #273141;
+  --primary: #6ea8fe;
+  --danger: #ff6b6b;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: radial-gradient(1200px 600px at 20% 0%, #101621 0%, var(--bg) 50%), var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+}
+
+.wrap {
+  max-width: 920px;
+  margin: 36px auto;
+  padding: 0 16px;
+}
+
+.header h1 {
+  margin: 0 0 6px 0;
+  font-size: 24px;
+}
+
+.card {
+  background: color-mix(in srgb, var(--card) 92%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  margin: 14px 0;
+}
+
+.row {
+  display: flex;
+  gap: 12px;
+  align-items: end;
+}
+
+.grow { flex: 1; }
+.right { margin-left: auto; }
+
+.label {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+.muted { color: var(--muted); }
+.mono { font-family: var(--mono); font-size: 13px; }
+
+.passwordRow {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+#passwordValue {
+  flex: 1;
+}
+
+input, select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #0f1319;
+  color: var(--text);
+}
+
+button {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #0f1319;
+  color: var(--text);
+  cursor: pointer;
+}
+
+button.primary {
+  background: color-mix(in srgb, var(--primary) 18%, #0f1319);
+  border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+}
+
+.output {
+  min-height: 220px;
+  max-height: 520px;
+  overflow: auto;
+  padding: 12px;
+  border-radius: 10px;
+  background: #0a0e14;
+  border: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 13px;
+  white-space: pre-wrap;
+}
+
+.footer { margin-top: 8px; font-size: 12px; }
